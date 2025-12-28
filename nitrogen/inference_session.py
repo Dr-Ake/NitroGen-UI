@@ -1,5 +1,6 @@
 import time
 import json
+from contextlib import nullcontext
 from collections import deque
 
 import torch
@@ -49,7 +50,10 @@ def load_model(checkpoint_path: str):
     print(json.dumps(ckpt_config.model_dump(), indent=4))
 
     # Initialize tokenizer and language model
-    img_proc = AutoImageProcessor.from_pretrained(model_cfg.vision_encoder_name)
+    img_proc = AutoImageProcessor.from_pretrained(
+        model_cfg.vision_encoder_name,
+        use_fast=True
+    )
 
     # Create VLM with pre-loaded language model
     if isinstance(model_cfg, NitroGen_Config):
@@ -76,9 +80,12 @@ def load_model(checkpoint_path: str):
     model.load_state_dict(checkpoint["model"])
     model.eval()
     tokenizer.eval()
-    model.to("cuda")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type != "cuda":
+        print("CUDA is not available; using CPU for inference.")
+    model.to(device)
 
-    return model, tokenizer, img_proc, ckpt_config, game_mapping, action_downsample_ratio
+    return model, tokenizer, img_proc, ckpt_config, game_mapping, action_downsample_ratio, device
 
 class InferenceSession:
     """Manages state for a single inference session."""
@@ -95,6 +102,7 @@ class InferenceSession:
         old_layout: bool,
         cfg_scale: float,
         action_downsample_ratio: float,
+        device: torch.device,
         context_length=None
     ):
         self.model = model
@@ -107,6 +115,7 @@ class InferenceSession:
         self.cfg_scale = cfg_scale
         self.action_downsample_ratio = action_downsample_ratio
         self.ckpt_path = ckpt_path
+        self.device = device
 
         # Load modality config
         self.modality_config = self.ckpt_config.modality_cfg
@@ -122,7 +131,7 @@ class InferenceSession:
     @classmethod
     def from_ckpt(cls, checkpoint_path: str, old_layout=False, cfg_scale=1.0, context_length=None):
         """Create an InferenceSession from a checkpoint."""
-        model, tokenizer, img_proc, ckpt_config, game_mapping, action_downsample_ratio = load_model(checkpoint_path)
+        model, tokenizer, img_proc, ckpt_config, game_mapping, action_downsample_ratio, device = load_model(checkpoint_path)
 
         if game_mapping is not None:
             # Ask user to pick a game from the list
@@ -155,6 +164,7 @@ class InferenceSession:
             old_layout,
             cfg_scale,
             action_downsample_ratio,
+            device,
             context_length
         )
 
@@ -168,6 +178,7 @@ class InferenceSession:
             "action_interleaving": self.action_interleaving,
             "is_flowmatching": self.is_flowmatching,
             "action_downsample_ratio": self.action_downsample_ratio,
+            "device": str(self.device),
         }
 
     def reset(self):
@@ -179,6 +190,7 @@ class InferenceSession:
         start_time = time.time()
 
         current_frame = self.img_proc([obs], return_tensors="pt")["pixel_values"]
+        current_frame = current_frame.to(self.device)
         self.obs_buffer.append(current_frame)
         
         # Prepare model inputs
@@ -229,9 +241,9 @@ class InferenceSession:
 
         available_frames = len(self.obs_buffer)
         frames = torch.zeros((self.max_buffer_size, *pixel_values.shape[1:]), 
-                            dtype=pixel_values.dtype, device="cuda")
+                            dtype=pixel_values.dtype, device=self.device)
         frames[-available_frames:] = pixel_values
-        dropped_frames = torch.zeros((self.max_buffer_size,), dtype=torch.bool, device="cuda")
+        dropped_frames = torch.zeros((self.max_buffer_size,), dtype=torch.bool, device=self.device)
         dropped_frames[:self.max_buffer_size - available_frames] = True
         
         data_with_history = {
@@ -241,7 +253,7 @@ class InferenceSession:
         }
         tokenized_data_with_history = self.tokenizer.encode(data_with_history)
         
-        frame_mask = torch.ones((self.max_buffer_size,), dtype=torch.bool, device="cuda")
+        frame_mask = torch.ones((self.max_buffer_size,), dtype=torch.bool, device=self.device)
         frame_mask[-1] = False
         data_without_history = {
             "frames": frames,
@@ -254,14 +266,19 @@ class InferenceSession:
         for tokenized_data in [tokenized_data_with_history, tokenized_data_without_history]:
             for k, v in tokenized_data.items():
                 if isinstance(v, torch.Tensor):
-                    tokenized_data[k] = v.unsqueeze(0).to("cuda")
+                    tokenized_data[k] = v.unsqueeze(0).to(self.device)
                 elif isinstance(v, np.ndarray):
-                    tokenized_data[k] = torch.tensor(v, device="cuda").unsqueeze(0)
+                    tokenized_data[k] = torch.tensor(v, device=self.device).unsqueeze(0)
                 else:
                     tokenized_data[k] = [v]
         
         with torch.inference_mode():
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            autocast_ctx = (
+                torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+                if self.device.type == "cuda"
+                else nullcontext()
+            )
+            with autocast_ctx:
                 if self.cfg_scale == 1.0:
                     model_output = self.model.get_action(tokenized_data_with_history, 
                                                         old_layout=self.old_layout)

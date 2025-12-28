@@ -24,7 +24,7 @@ We **do not distribute game environments**, you must use your own copies of the 
 
 ## One-click install (Windows)
 
-If you are on Windows, you can use the installer to set up a local virtual environment, install dependencies, and download the model checkpoint:
+If you are on Windows, you can use the installer to set up a local virtual environment, install dependencies, and download the model checkpoint. It automatically installs CUDA-enabled PyTorch (torch + torchvision) on NVIDIA GPUs, otherwise it uses CPU-only builds.
 ```bash
 install.bat
 ```

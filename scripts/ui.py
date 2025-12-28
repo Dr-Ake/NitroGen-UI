@@ -302,6 +302,7 @@ class NitroGenUI(tk.Tk):
     def _launch_process(self, cmd: list[str], tag: str) -> subprocess.Popen:
         proc = subprocess.Popen(
             cmd,
+            cwd=str(ROOT),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

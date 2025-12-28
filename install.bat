@@ -30,12 +30,28 @@ echo [NitroGen] Upgrading pip...
 python -m pip install --upgrade pip
 if errorlevel 1 exit /b 1
 
+echo [NitroGen] Detecting NVIDIA GPU for CUDA support...
+set "HAS_NVIDIA="
+where nvidia-smi >nul 2>&1 && set "HAS_NVIDIA=1"
+if not defined HAS_NVIDIA (
+    wmic path win32_VideoController get name | find /I "NVIDIA" >nul 2>&1 && set "HAS_NVIDIA=1"
+)
+
+if defined HAS_NVIDIA (
+    echo [NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
+    python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+) else (
+    echo [NitroGen] No NVIDIA GPU detected. Installing CPU-only PyTorch...
+    python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+)
+if errorlevel 1 exit /b 1
+
 echo [NitroGen] Installing NitroGen dependencies...
 python -m pip install -e .
 if errorlevel 1 exit /b 1
 
-echo [NitroGen] Installing Hugging Face Hub client...
-python -m pip install --upgrade huggingface_hub
+echo [NitroGen] Installing Hugging Face Hub client (compatible version)...
+python -m pip install "huggingface_hub>=0.34.0,<1.0"
 if errorlevel 1 exit /b 1
 
 echo [NitroGen] Downloading model checkpoint (ng.pt). This can be large...
