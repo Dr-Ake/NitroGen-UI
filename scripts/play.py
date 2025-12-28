@@ -19,6 +19,14 @@ parser = argparse.ArgumentParser(description="VLM Inference")
 parser.add_argument("--process", type=str, default="celeste.exe", help="Game to play")
 parser.add_argument("--allow-menu", action="store_true", help="Allow menu actions (Disabled by default)")
 parser.add_argument("--port", type=int, default=5555, help="Port for model server")
+parser.add_argument("--no-speedhack", action="store_true", help="Disable DLL speedhack injection")
+parser.add_argument(
+    "--screenshot-backend",
+    type=str,
+    default="dxcam",
+    choices=["dxcam", "pyautogui"],
+    help="Screenshot backend (dxcam is faster, pyautogui is more compatible)",
+)
 
 args = parser.parse_args()
 
@@ -90,11 +98,14 @@ for i in range(3):
     print(f"{3 - i}...")
     time.sleep(1)
 
+use_speedhack = not args.no_speedhack
 env = GamepadEnv(
     game=args.process,
     game_speed=1.0,
     env_fps=60,
-    async_mode=True,
+    async_mode=use_speedhack,
+    use_speedhack=use_speedhack,
+    screenshot_backend=args.screenshot_backend,
 )
 
 # These games requires to open a menu to initialize the controller

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local caches/outputs
+.cache/
+debug/
+out/
+
+# Large checkpoints
+ng.pt
+*.pt
+
+# OS junk
+.DS_Store
+Thumbs.db

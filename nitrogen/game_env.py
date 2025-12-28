@@ -340,6 +340,14 @@ class GamepadEmulator:
         self.gamepad.update()
 
 
+class _NullSpeedhackClient:
+    def __init__(self, reason=None):
+        self.reason = reason
+
+    def set_speed(self, _speed):
+        pass
+
+
 class PyautoguiScreenshotBackend:
 
     def __init__(self, bbox):
@@ -382,6 +390,7 @@ class GamepadEnv(Env):
     game_speed (float): Speed multiplier for the game.
     env_fps (int): Number of actions to perform per second at normal speed.
     async_mode (bool): Whether to pause/unpause the game during each step.
+    use_speedhack (bool): Whether to allow DLL-based speedhack injection.
     """
 
     def __init__(
@@ -394,6 +403,7 @@ class GamepadEnv(Env):
             env_fps=10,
             async_mode=True,
             screenshot_backend="dxcam",
+            use_speedhack=True,
     ):
         super().__init__()
 
@@ -410,6 +420,7 @@ class GamepadEnv(Env):
         self.env_fps = env_fps
         self.step_duration = self.calculate_step_duration()
         self.async_mode = async_mode
+        self.use_speedhack = bool(use_speedhack)
 
         self.gamepad_emulator = GamepadEmulator(controller_type=controller_type, system=os_name)
         proc_info = get_process_info(game)
@@ -471,7 +482,20 @@ class GamepadEnv(Env):
         self.bbox = (l, t, r - l, b - t)
 
         # Initialize speedhack client if using DLL injection
-        self.speedhack_client = xsh.Client(process_id=self.game_pid, arch=self.game_arch)
+        self.speedhack_client = _NullSpeedhackClient(reason="speedhack not initialized")
+        self.speedhack_enabled = False
+        if self.async_mode and self.use_speedhack:
+            try:
+                self.speedhack_client = xsh.Client(process_id=self.game_pid, arch=self.game_arch)
+                self.speedhack_enabled = True
+            except Exception as exc:
+                self.speedhack_client = _NullSpeedhackClient(reason=str(exc))
+                self.speedhack_enabled = False
+                print(
+                    "Warning: speedhack disabled (DLL injection failed); "
+                    "the game will run at normal speed. "
+                    f"Details: {exc}"
+                )
 
         # Get the screenshot backend
         if screenshot_backend == "dxcam":
@@ -498,13 +522,15 @@ class GamepadEnv(Env):
         """
         Unpause the game using the specified method.
         """
-        self.speedhack_client.set_speed(1.0)
+        if self.speedhack_enabled:
+            self.speedhack_client.set_speed(1.0)
 
     def pause(self):
         """
         Pause the game using the specified method.
         """
-        self.speedhack_client.set_speed(0.0)
+        if self.speedhack_enabled:
+            self.speedhack_client.set_speed(0.0)
 
     def perform_action(self, action, duration):
         """
@@ -515,14 +541,17 @@ class GamepadEnv(Env):
         duration (float): Duration for the action step.
         """
         self.gamepad_emulator.step(action)
-        start = time.perf_counter()
-        self.unpause()
-        # Wait until the next step
-        end = start + self.step_duration
-        now = time.perf_counter()
-        while now < end:
+        if self.async_mode and self.speedhack_enabled:
+            start = time.perf_counter()
+            self.unpause()
+            # Wait until the next step
+            end = start + duration
             now = time.perf_counter()
-        self.pause()
+            while now < end:
+                now = time.perf_counter()
+            self.pause()
+        else:
+            time.sleep(duration)
 
     def step(self, action, step_duration=None):
         """
