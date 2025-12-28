@@ -22,6 +22,18 @@ NitroGen is trained through behavior cloning on the largest video-action gamepla
 
 We **do not distribute game environments**, you must use your own copies of the games. This repository only supports running the agent on **Windows games**. You can serve the model from a Linux machine for inference, but the game ultimately has to run on Windows. We have tested on Windows 11 with Python ≥ 3.12.
 
+## One-click install (Windows)
+
+If you are on Windows, you can use the installer to set up a local virtual environment, install dependencies, and download the model checkpoint:
+```bash
+install.bat
+```
+
+When it finishes, launch the UI with:
+```bash
+run_ui.bat
+```
+
 ## Setup
 
 Install this repo:
@@ -48,7 +60,25 @@ Then, run the agent on the game of your choice:
 python scripts/play.py --process '<game_executable_name>.exe'
 ```
 
+Useful options:
+- `--no-speedhack` disables DLL speedhack injection if it causes issues.
+- `--screenshot-backend dxcam|pyautogui` switches between fast DXCAM capture and a more compatible PyAutoGUI fallback.
+
+
 The `--process` parameter must be the exact executable name of the game you want to play. You can find it by right-clicking on the game process in Windows Task Manager (Ctrl+Shift+Esc), and selecting `Properties`. The process name should be in the `General` tab and end with `.exe`.
+
+# UI (optional)
+
+You can also use the built-in launcher UI:
+```bash
+python scripts/ui.py
+```
+
+From the UI you can:
+- pick the checkpoint
+- start/stop the model server
+- start/stop the agent
+- toggle menu actions, speedhack injection, and fast frame reads (DXCAM)
 
 # Paper and Citation
 
