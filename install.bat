@@ -39,6 +39,7 @@ set "HAS_NVIDIA="
 set "TORCH_INDEX="
 set "TORCH_PRE="
 set "GPU_NAME="
+set "GPU_NAME_STRIPPED="
 set "NEED_NIGHTLY="
 where nvidia-smi >nul 2>&1 && set "HAS_NVIDIA=1"
 if not defined HAS_NVIDIA (
@@ -46,26 +47,27 @@ if not defined HAS_NVIDIA (
 )
 
 if defined HAS_NVIDIA (
-    for /f "usebackq delims=" %%A in (`nvidia-smi --query-gpu=name --format=csv,noheader 2^>nul`) do if not defined GPU_NAME set "GPU_NAME=%%A"
+    set "TORCH_INDEX=https://download.pytorch.org/whl/cu121"
+    if /I "%FORCE_TORCH_NIGHTLY%"=="1" set "NEED_NIGHTLY=1"
+    for /f "usebackq tokens=1,* delims=:" %%A in (`nvidia-smi -L 2^>nul`) do if not defined GPU_NAME set "GPU_NAME=%%B"
     if not defined GPU_NAME (
         for /f "skip=1 tokens=* delims=" %%A in ('wmic path win32_VideoController get name ^| find /I "NVIDIA" 2^>nul') do if not defined GPU_NAME set "GPU_NAME=%%A"
     )
-    if /I "%FORCE_TORCH_NIGHTLY%"=="1" set "NEED_NIGHTLY=1"
     if defined GPU_NAME (
-        set "GPU_NAME=!GPU_NAME: =!"
-        echo !GPU_NAME! | find /I "RTX50" >nul && set "NEED_NIGHTLY=1"
-        echo !GPU_NAME! | find /I "RTX 50" >nul && set "NEED_NIGHTLY=1"
+        set "GPU_NAME_STRIPPED=!GPU_NAME: =!"
+        echo !GPU_NAME_STRIPPED! | find /I "RTX50" >nul && set "NEED_NIGHTLY=1"
     )
     if defined NEED_NIGHTLY (
         set "TORCH_INDEX=https://download.pytorch.org/whl/nightly/cu124"
         set "TORCH_PRE=--pre"
         echo [NitroGen] Using PyTorch nightly for RTX 50xx support...
     ) else (
-        set "TORCH_INDEX=https://download.pytorch.org/whl/cu121"
         echo [NitroGen] Using stable CUDA build for detected NVIDIA GPU.
     )
     if defined GPU_NAME (
         echo [NitroGen] GPU: !GPU_NAME!
+    ) else (
+        echo [NitroGen] GPU: NVIDIA (name unavailable)
     )
     echo [NitroGen] PyTorch index: !TORCH_INDEX!
     echo [NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
