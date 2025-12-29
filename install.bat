@@ -38,28 +38,37 @@ echo [NitroGen] Detecting NVIDIA GPU for CUDA support...
 set "HAS_NVIDIA="
 set "TORCH_INDEX="
 set "TORCH_PRE="
+set "TORCH_CUDA_STABLE=cu130"
+set "TORCH_CUDA_NIGHTLY=cu130"
+set "TORCHVISION_NO_DEPS="
+set "ALLOW_TORCHVISION_FAIL="
 set "GPU_NAME="
-set "GPU_NAME_STRIPPED="
 set "NEED_NIGHTLY="
+if defined FORCE_TORCH_CUDA (
+    set "TORCH_CUDA_STABLE=%FORCE_TORCH_CUDA%"
+    set "TORCH_CUDA_NIGHTLY=%FORCE_TORCH_CUDA%"
+)
 where nvidia-smi >nul 2>&1 && set "HAS_NVIDIA=1"
 if not defined HAS_NVIDIA (
     wmic path win32_VideoController get name | find /I "NVIDIA" >nul 2>&1 && set "HAS_NVIDIA=1"
 )
 
 if defined HAS_NVIDIA (
-    set "TORCH_INDEX=https://download.pytorch.org/whl/cu121"
+    set "TORCH_INDEX=https://download.pytorch.org/whl/!TORCH_CUDA_STABLE!"
     if /I "%FORCE_TORCH_NIGHTLY%"=="1" set "NEED_NIGHTLY=1"
     for /f "usebackq tokens=1,* delims=:" %%A in (`nvidia-smi -L 2^>nul`) do if not defined GPU_NAME set "GPU_NAME=%%B"
     if not defined GPU_NAME (
         for /f "skip=1 tokens=* delims=" %%A in ('wmic path win32_VideoController get name ^| find /I "NVIDIA" 2^>nul') do if not defined GPU_NAME set "GPU_NAME=%%A"
     )
-    if defined GPU_NAME (
-        set "GPU_NAME_STRIPPED=!GPU_NAME: =!"
-        echo !GPU_NAME_STRIPPED! | find /I "RTX50" >nul && set "NEED_NIGHTLY=1"
+    if /I "%FORCE_TORCH_STABLE%"=="1" (
+        set "NEED_NIGHTLY="
+        echo [NitroGen] Forcing stable PyTorch build (FORCE_TORCH_STABLE=1).
     )
     if defined NEED_NIGHTLY (
-        set "TORCH_INDEX=https://download.pytorch.org/whl/nightly/cu124"
+        set "TORCH_INDEX=https://download.pytorch.org/whl/nightly/!TORCH_CUDA_NIGHTLY!"
         set "TORCH_PRE=--pre"
+        set "TORCHVISION_NO_DEPS=--no-deps"
+        set "ALLOW_TORCHVISION_FAIL=1"
         echo [NitroGen] Using PyTorch nightly for RTX 50xx support...
     ) else (
         echo [NitroGen] Using stable CUDA build for detected NVIDIA GPU.
@@ -72,13 +81,27 @@ if defined HAS_NVIDIA (
     echo [NitroGen] PyTorch index: !TORCH_INDEX!
     echo [NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
     python -m pip uninstall -y torch torchvision torchaudio >nul 2>&1
-    python -m pip install !TORCH_PRE! torch torchvision --index-url !TORCH_INDEX!
+    python -m pip install !TORCH_PRE! torch --index-url !TORCH_INDEX!
+    if errorlevel 1 goto :fail
+    if /I "%SKIP_TORCHVISION%"=="1" (
+        echo [NitroGen] Skipping torchvision install (SKIP_TORCHVISION=1).
+    ) else (
+        python -m pip install !TORCH_PRE! torchvision !TORCHVISION_NO_DEPS! --index-url !TORCH_INDEX!
+        if errorlevel 1 (
+            if defined ALLOW_TORCHVISION_FAIL (
+                echo [NitroGen] Warning: torchvision install failed. Continuing with torch only.
+                cmd /c exit /b 0
+            ) else (
+                goto :fail
+            )
+        )
+    )
 ) else (
     echo [NitroGen] No NVIDIA GPU detected. Installing CPU-only PyTorch...
     python -m pip uninstall -y torch torchvision torchaudio >nul 2>&1
     python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    if errorlevel 1 goto :fail
 )
-if errorlevel 1 goto :fail
 
 set "STEP=Installing NitroGen dependencies"
 echo [NitroGen] Installing NitroGen dependencies...
