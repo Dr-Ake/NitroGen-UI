@@ -24,7 +24,7 @@ We **do not distribute game environments**, you must use your own copies of the 
 
 ## One-click install (Windows)
 
-If you are on Windows, you can use the installer to set up a local virtual environment, install dependencies, and download the model checkpoint. It automatically installs CUDA-enabled PyTorch (torch + torchvision) on NVIDIA GPUs using the latest stable CUDA wheel (default `cu130`), otherwise it uses CPU-only builds. Set `FORCE_TORCH_NIGHTLY=1` to use nightly builds or `FORCE_TORCH_CUDA=cu130` (or another tag) to override the CUDA wheel tag.
+If you are on Windows, you can use the installer to set up a local virtual environment, install dependencies, and download the model checkpoint. It automatically installs CUDA-enabled PyTorch (torch + torchvision) on NVIDIA GPUs using the latest stable CUDA wheel (default `cu130`, with fallback to `cu124`/`cu121` if needed), otherwise it uses CPU-only builds. Set `FORCE_TORCH_NIGHTLY=1` to use nightly builds or `FORCE_TORCH_CUDA=cu130` (or another tag) to override the CUDA wheel tag.
 ```bash
 install.bat
 ```

@@ -39,6 +39,7 @@ set "HAS_NVIDIA="
 set "TORCH_INDEX="
 set "TORCH_PRE="
 set "TORCH_CUDA_STABLE=cu130"
+set "TORCH_CUDA_FALLBACKS=cu124 cu121"
 set "TORCH_CUDA_NIGHTLY=cu130"
 set "TORCHVISION_NO_DEPS="
 set "ALLOW_TORCHVISION_FAIL="
@@ -47,6 +48,7 @@ set "NEED_NIGHTLY="
 if defined FORCE_TORCH_CUDA (
     set "TORCH_CUDA_STABLE=%FORCE_TORCH_CUDA%"
     set "TORCH_CUDA_NIGHTLY=%FORCE_TORCH_CUDA%"
+    set "TORCH_CUDA_FALLBACKS="
 )
 where nvidia-smi >nul 2>&1 && set "HAS_NVIDIA=1"
 if not defined HAS_NVIDIA (
@@ -54,7 +56,6 @@ if not defined HAS_NVIDIA (
 )
 
 if defined HAS_NVIDIA (
-    set "TORCH_INDEX=https://download.pytorch.org/whl/!TORCH_CUDA_STABLE!"
     if /I "%FORCE_TORCH_NIGHTLY%"=="1" set "NEED_NIGHTLY=1"
     for /f "usebackq tokens=1,* delims=:" %%A in (`nvidia-smi -L 2^>nul`) do if not defined GPU_NAME set "GPU_NAME=%%B"
     if not defined GPU_NAME (
@@ -62,27 +63,45 @@ if defined HAS_NVIDIA (
     )
     if /I "%FORCE_TORCH_STABLE%"=="1" (
         set "NEED_NIGHTLY="
-        echo [NitroGen] Forcing stable PyTorch build (FORCE_TORCH_STABLE=1).
+        echo [NitroGen] Forcing stable PyTorch build: FORCE_TORCH_STABLE=1.
     )
     if defined NEED_NIGHTLY (
         set "TORCH_INDEX=https://download.pytorch.org/whl/nightly/!TORCH_CUDA_NIGHTLY!"
         set "TORCH_PRE=--pre"
         set "TORCHVISION_NO_DEPS=--no-deps"
         set "ALLOW_TORCHVISION_FAIL=1"
-        echo [NitroGen] Using PyTorch nightly for RTX 50xx support...
+        echo [NitroGen] Using PyTorch nightly build: FORCE_TORCH_NIGHTLY=1.
     ) else (
-        echo [NitroGen] Using stable CUDA build for detected NVIDIA GPU.
+        echo [NitroGen] Using stable PyTorch build for detected NVIDIA GPU.
     )
     if defined GPU_NAME (
         echo [NitroGen] GPU: !GPU_NAME!
     ) else (
         echo [NitroGen] GPU: NVIDIA (name unavailable)
     )
-    echo [NitroGen] PyTorch index: !TORCH_INDEX!
     echo [NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
     python -m pip uninstall -y torch torchvision torchaudio >nul 2>&1
-    python -m pip install !TORCH_PRE! torch --index-url !TORCH_INDEX!
-    if errorlevel 1 goto :fail
+    if defined NEED_NIGHTLY (
+        echo [NitroGen] PyTorch index: !TORCH_INDEX!
+        python -m pip install !TORCH_PRE! torch --index-url !TORCH_INDEX!
+        if errorlevel 1 goto :fail
+    ) else (
+        set "TORCH_INSTALLED="
+        set "TORCH_CUDA_USED="
+        for %%C in (!TORCH_CUDA_STABLE! !TORCH_CUDA_FALLBACKS!) do (
+            if not defined TORCH_INSTALLED (
+                set "TORCH_INDEX=https://download.pytorch.org/whl/%%C"
+                echo [NitroGen] Trying PyTorch index: !TORCH_INDEX!
+                python -m pip install !TORCH_PRE! torch --index-url !TORCH_INDEX!
+                if not errorlevel 1 (
+                    set "TORCH_INSTALLED=1"
+                    set "TORCH_CUDA_USED=%%C"
+                )
+            )
+        )
+        if not defined TORCH_INSTALLED goto :fail
+        echo [NitroGen] PyTorch index: !TORCH_INDEX!
+    )
     if /I "%SKIP_TORCHVISION%"=="1" (
         echo [NitroGen] Skipping torchvision install (SKIP_TORCHVISION=1).
     ) else (
