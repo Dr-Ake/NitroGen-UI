@@ -77,7 +77,7 @@ if defined HAS_NVIDIA (
     if defined GPU_NAME (
         echo [NitroGen] GPU: !GPU_NAME!
     ) else (
-        echo [NitroGen] GPU: NVIDIA (name unavailable)
+        echo [NitroGen] GPU: NVIDIA name unavailable
     )
     echo [NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
     python -m pip uninstall -y torch torchvision torchaudio >nul 2>&1
@@ -103,8 +103,9 @@ if defined HAS_NVIDIA (
         echo [NitroGen] PyTorch index: !TORCH_INDEX!
     )
     if /I "%SKIP_TORCHVISION%"=="1" (
-        echo [NitroGen] Skipping torchvision install (SKIP_TORCHVISION=1).
+        echo [NitroGen] Skipping torchvision install: SKIP_TORCHVISION=1.
     ) else (
+        echo [NitroGen] Installing torchvision...
         python -m pip install !TORCH_PRE! torchvision !TORCHVISION_NO_DEPS! --index-url !TORCH_INDEX!
         if errorlevel 1 (
             if defined ALLOW_TORCHVISION_FAIL (
@@ -114,6 +115,7 @@ if defined HAS_NVIDIA (
                 goto :fail
             )
         )
+        echo [NitroGen] torchvision install complete.
     )
 ) else (
     echo [NitroGen] No NVIDIA GPU detected. Installing CPU-only PyTorch...

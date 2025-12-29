@@ -3,3 +3,22 @@
 [NitroGen] Upgrading pip...
 Requirement already satisfied: pip in c:\nitrogen-ui\.venv\lib\site-packages (25.3)
 [NitroGen] Detecting NVIDIA GPU for CUDA support...
+[NitroGen] Using stable PyTorch build for detected NVIDIA GPU.
+[NitroGen] GPU:  NVIDIA GeForce RTX 5090 (UUID: GPU-de4f64dd-c649-4027-fc1d-7353352c1c60)
+[NitroGen] NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
+[NitroGen] Trying PyTorch index: https://download.pytorch.org/whl/cu130
+Looking in indexes: https://download.pytorch.org/whl/cu130
+Collecting torch
+  Using cached https://download.pytorch.org/whl/cu130/torch-2.9.1%2Bcu130-cp310-cp310-win_amd64.whl.metadata (29 kB)
+Requirement already satisfied: filelock in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (3.20.0)
+Requirement already satisfied: typing-extensions>=4.10.0 in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (4.15.0)
+Requirement already satisfied: sympy>=1.13.3 in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (1.14.0)
+Requirement already satisfied: networkx>=2.5.1 in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (3.4.2)
+Requirement already satisfied: jinja2 in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (3.1.6)
+Requirement already satisfied: fsspec>=0.8.5 in c:\nitrogen-ui\.venv\lib\site-packages (from torch) (2025.12.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in c:\nitrogen-ui\.venv\lib\site-packages (from sympy>=1.13.3->torch) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in c:\nitrogen-ui\.venv\lib\site-packages (from jinja2->torch) (2.1.5)
+Using cached https://download.pytorch.org/whl/cu130/torch-2.9.1%2Bcu130-cp310-cp310-win_amd64.whl (1862.1 MB)
+Installing collected packages: torch
+Successfully installed torch-2.9.1+cu130
+[NitroGen] PyTorch index: https://download.pytorch.org/whl/cu130
